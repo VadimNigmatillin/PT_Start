@@ -11,7 +11,7 @@ all:
       ansible_ssh_pass: root 
       dirfromsql: /home/kali/Desktop/ansible
       dirgitclone: /home/ubunta/Desktop/ 
-      TOKEN: 6493306509:AAGYjS-99y3jXgeLsekWbQtiqcKvJ9pobig 
+      TOKEN:  
       RMHOST: 192.168.0.190
       RMPORT: 22
       RMUSER: kali
