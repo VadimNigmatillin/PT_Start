@@ -1,0 +1,29 @@
+all:
+  vars:
+    DBREPLUSER: repl_user
+    DBREPLPASSWORD: Qq12345 
+    POSTGRESVERSION: 14
+    DBHOST: 192.168.0.151
+  hosts:
+    host1:
+      ansible_host: 192.168.0.151
+      ansible_user: ubunta
+      ansible_ssh_pass: root 
+      dirfromsql: /home/kali/Desktop/ansible
+      dirgitclone: /home/ubunta/Desktop/ 
+      TOKEN: 6493306509:AAGYjS-99y3jXgeLsekWbQtiqcKvJ9pobig 
+      RMHOST: 192.168.0.190
+      RMPORT: 22
+      RMUSER: kali
+      RMPASSWORD: kali
+      DBUSER: postgres
+      DBPASSWORD: Qq12345 
+      DBPORT: 5432
+      DBDATABASE: telegram_bot
+      DBREPLHOST: db_repl
+      DBREPLPORT: 5432
+    host2:
+      ansible_host: 192.168.0.127
+      ansible_user: roott
+      ansible_ssh_pass: root 
+      

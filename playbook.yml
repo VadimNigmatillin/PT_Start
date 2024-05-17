@@ -1,0 +1,147 @@
+- name: installing packages
+  hosts: all
+  gather_facts: false
+  become: yes 
+  tasks:
+    - name: install postgres
+      package: 
+        name: postgresql
+        state: present
+    - name: install libpq-dev
+      package:
+        name: libpq-dev
+        state: present
+    - name: install psycopg
+      package: 
+        name: postgresql-contrib
+        state: present
+- name: db initialization
+  hosts: host1
+  gather_facts: false
+  tasks:
+    - name: copy init.sql
+      become: true
+      become_user: root
+      copy:
+        src: "{{ hostvars[inventory_hostname]['dirfromsql'] }}/init.sql"
+        dest: /tmp/init.sql
+        mode: '0644'
+    - name: chown
+      become: true
+      become_user: root
+      command: chown postgres:postgres /tmp/init.sql
+    - name: db
+      become: true
+      become_user: root
+      replace:
+        path: /tmp/init.sql
+        regexp: "telegram_bot"
+        replace: "{{ hostvars[inventory_hostname]['DBDATABASE'] }}"
+    - name: user
+      become: true
+      become_user: root
+      replace:
+        path: /tmp/init.sql
+        regexp: "repl_user"
+        replace: "{{ hostvars[inventory_hostname]['DBREPLUSER'] }}"
+    - name: passwd
+      become: true
+      become_user: root
+      replace:
+        path: /tmp/init.sql
+        regexp: "Qq12345"
+        replace: "{{ hostvars[inventory_hostname]['DBREPLPASSWORD'] }}"
+    - name: restart postgres
+      become: true
+      become_user: root
+      service:
+        name: postgresql
+        state: restarted
+    - name: init.sql
+      command: psql -a -f /tmp/init.sql
+      become: true
+      become_user: postgres
+- name: repl
+  hosts: host1
+  gather_facts: false
+  tasks:
+    - name: configuration file
+      become: true
+      become_user: root
+      blockinfile:
+        path: "/etc/postgresql/{{ hostvars[inventory_hostname]['POSTGRESVERSION'] }}/main/postgresql.conf"
+        block: |
+          listen_addresses = '*'
+          hot_standby=on
+          max_wal_senders=10
+          wal_level=replica
+          wal_log_hints=on
+          hot_standby_feedback=on
+          max_replication_slots=10
+          logging_collector=on
+          max_connections=100
+          log_replication_commands=on
+    - name: pg_hba configuration
+      become: true
+      become_user: root
+      blockinfile:
+        path: "/etc/postgresql/{{ hostvars[inventory_hostname]['POSTGRESVERSION'] }}/main/pg_hba.conf"
+        block: | 
+          host replication all {{ hostvars[inventory_hostname]['ansible_host'] }}/24 scram-sha-256
+          host all all {{ hostvars[inventory_hostname]['ansible_host'] }}/32 trust
+    - name: restart postgres
+      become: true
+      become_user: root
+      service:
+        name: postgresql
+        state: restarted
+- name: slave configuration
+  become: true
+  become_user: root
+  hosts: host2
+  gather_facts: false
+  tasks:
+    - name: remove
+      command: rm -rf /var/lib/postgresql/{{ hostvars[inventory_hostname]['POSTGRESVERSION'] }}/
+    - name: pg_basebackup
+      command: pg_basebackup -h {{ hostvars[inventory_hostname]['DBHOST'] }} -D /var/lib/postgresql/{{ hostvars[inventory_hostname]['POSTGRESVERSION'] }}/main/ -U {{ hostvars[inventory_hostname]['DBREPLUSER'] }} -vP -w
+      environment: 
+        PGPASSWORD: "{{ hostvars[inventory_hostname]['DBREPLPASSWORD'] }}"
+    - name: chown
+      command: chown -R postgres:postgres /var/lib/postgresql/
+    - name: restart postgres
+      service:
+        name: postgresql
+        state: restarted
+
+- name: bot initialization
+  become: true
+  become_user: root
+  hosts: host1
+  gather_facts: false
+  tasks:
+    - name: mkdir
+      command: mkdir -p "{{ hostvars[inventory_hostname]['dirgitclone'] }}/gitclone"
+    - name: git clone
+      git:
+        repo: https://github.com/VadimNigmatillin/Bot.git
+        dest: "{{ hostvars[inventory_hostname]['dirgitclone'] }}/gitclone"
+        version: master
+    - name: pip install
+      pip: 
+        requirements: "{{ hostvars[inventory_hostname]['dirgitclone'] }}/gitclone/requirements.txt"
+    - name: run bot
+      command: python3 "{{ hostvars[inventory_hostname]['dirgitclone'] }}/gitclone/Bot.py"
+      environment:
+        TOKEN: "{{ hostvars[inventory_hostname]['TOKEN'] }}"
+        RMHOST: "{{ hostvars[inventory_hostname]['RMHOST'] }}"
+        RMPORT: "{{ hostvars[inventory_hostname]['RMPORT'] }}"
+        RMUSER: "{{ hostvars[inventory_hostname]['RMUSER'] }}"
+        RMPASSWORD: "{{ hostvars[inventory_hostname]['RMPASSWORD'] }}"
+        DBHOST: "{{ hostvars[inventory_hostname]['ansible_host'] }}"
+        DBPORT: "{{ hostvars[inventory_hostname]['DBPORT'] }}"
+        DBUSER: "{{ hostvars[inventory_hostname]['DBUSER'] }}"
+        DBPASSWORD: "{{ hostvars[inventory_hostname]['DBPASSWORD'] }}"
+        DBDATABASE: "{{ hostvars[inventory_hostname]['DBDATABASE'] }}"
+   
+    
